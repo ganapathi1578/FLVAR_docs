@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Flows Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #004085;
+      --secondary-color: #e2e3e5;
+      --accent-color: #0056b3;
+      --bg-color: #f8f9fa;
+      --text-color: #212529;
+      --header-height: 60px;
+      --footer-height: 40px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Roboto', sans-serif;
+      color: var(--text-color);
+      background: var(--bg-color);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      height: var(--header-height);
+      background: var(--primary-color);
+      color: white;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    header .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    header nav {
+      margin-left: auto;
+    }
+    header nav a {
+      color: white;
+      text-decoration: none;
+      margin-left: 20px;
+      font-weight: 500;
+    }
+    main {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .flow-section {
+      display: flex;
+      align-items: stretch;
+      margin-bottom: 40px;
+      border: 1px solid var(--secondary-color);
+      border-radius: 8px;
+      background: white;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .flow-section:nth-child(even) .flow-image { order: 2; }
+    .flow-section:nth-child(even) .flow-text  { order: 1; }
+    .flow-image, .flow-text {
+      flex: 1;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .flow-image { background: var(--secondary-color); }
+    .flow-image svg { max-width: 100%; max-height: 100%; }
+    .flow-text {
+      flex-direction: column;
+      text-align: left;
+    }
+    .flow-text h3 {
+      margin-bottom: 1rem;
+      color: var(--primary-color);
+      font-size: 1.4rem;
+    }
+    .flow-text ol {
+      padding-left: 1.2em;
+      margin-bottom: 1em;
+    }
+    .flow-text li {
+      margin-bottom: 0.5em;
+      line-height: 1.5;
+    }
+    .flow-text code {
+      background: #f1f1f1;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+    .flow-text a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+    .flow-text a:hover {
+      text-decoration: underline;
+    }
+    footer {
+      height: var(--footer-height);
+      background: var(--primary-color);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Surveillance App Docs</div>
+    <nav>
+      <a href="#reverse-tunneling">Reverse Tunneling</a>
+      <a href="#registration">Registration</a>
+      <a href="#connection">House → Central</a>
+    </nav>
+  </header>
+  <main>
+
+    <section id="reverse-tunneling" class="flow-section">
+      <div class="flow-image">
+        <div class="mermaid">
+flowchart TD
+  CLIENT["Client Request\nGET /var/homes/{homeid}/{endpoint}"]
+  CS_PATH["Central: Extract homeid & path"]
+  CS_CHECK["Check Redis channel"]
+  CS_OFFLINE["Return 'Home Offline'"]
+  CS_FORWARD["Forward frame+ID to Local"]
+  LA["tunnelagent.py"]
+  NGINX["nginx:80 → /path"]
+  DJANGO["django:8001 Process"]
+  RESP["tunnelagent.py add frameID"]
+  CS_RESP["Central: Match frameID"]
+  MOBILE["Mobile Client Receives Data"]
+
+  CLIENT --> CS_PATH -->|Check Redis| CS_CHECK
+  CS_CHECK -->|Offline| CS_OFFLINE
+  CS_CHECK -->|Online| CS_FORWARD --> LA --> NGINX --> DJANGO --> NGINX --> RESP --> CS_RESP --> MOBILE
+        </div>
+      </div>
+      <div class="flow-text">
+        <h3>Reverse Tunneling</h3>
+        <ol>
+          <li><strong>Client</strong> issues <code>GET /var/homes/{homeid}/…</code> to Central.</li>
+          <li>Central checks Redis channel: offline → error; online → forward via WS.</li>
+          <li><code>tunnelagent.py</code> at Local routes through Nginx → Django.</li>
+          <li>Response tagged with <code>frameID</code>, sent back to Mobile.</li>
+        </ol>
+        <p>
+          See: <a href="local/tunnelagent.py#index">tunnelagent.py</a>, <a href="central/views.py#handle_tunnel">Central handler</a>
+        </p>
+      </div>
+    </section>
+
+    <section id="registration" class="flow-section">
+      <div class="flow-image">
+        <div class="mermaid">
+flowchart TD
+  LS_CONFIG["Configure Token\n(arhouse.json)"]
+  LS_SETUP["Run Local Server\n(or click Setup)"]
+  REGISTER["register.py → POST\n/register_or_get_id/"]
+  VALID["Central: Validate Token"]
+  SUCCESS["Return home_id & secret_key"]
+  ERROR["Return Error"]
+
+  LS_CONFIG --> LS_SETUP --> REGISTER
+  REGISTER -->|Valid| VALID --> SUCCESS --> STORE["Store in arhouse.json"]
+  REGISTER -->|Invalid| ERROR
+        </div>
+      </div>
+      <div class="flow-text">
+        <h3>Local Server Registration</h3>
+        <ol>
+          <li>Place the token in <code>arhouse.json</code>.</li>
+          <li>Start the server; it runs <code>register.py</code>.</li>
+          <li><code>register.py</code> sends <code>POST</code> to <code>/var/tunnel/api/register_or_get_id/</code>.</li>
+          <li>On success, store <code>home_id</code> & <code>secret_key</code> locally.</li>
+        </ol>
+        <p>
+          See: <a href="local/register.py#index">register.py</a>, <a href="local/api_client.py#index-post_register">post_register()</a>
+        </p>
+      </div>
+    </section>
+
+    <section id="connection" class="flow-section">
+      <div class="flow-image">
+        <div class="mermaid">
+flowchart TD
+  CS_RUN["Run Central Server"]
+  CS_HOME["Go to Home Page"]
+  CS_LOGIN["Login / Register"]
+  CS_TOKEN["Generate Token\n(expiry in minutes)"]
+
+  CS_RUN --> CS_HOME --> CS_LOGIN --> CS_TOKEN
+        </div>
+      </div>
+      <div class="flow-text">
+        <h3>House → Central Connection</h3>
+        <ol>
+          <li>Launch Central Server and navigate to home page.</li>
+          <li>Log in or register for a session.</li>
+          <li>Generate an access token with desired TTL.</li>
+          <li>Use this token to configure Local Server.</li>
+        </ol>
+        <p>
+          See: <a href="central/auth.py#index-generate_token">generate_token()</a>, <a href="central/views.py#login">login view</a>
+        </p>
+      </div>
+    </section>
+      <!-- Login Section -->
+   <section id="login" class="flow-section">
+  <div class="flow-image">
+    <div class="mermaid">
+flowchart TD
+  INPUT["User Input:\nHomeID, Username, Password"]
+  VALIDATE["Validate Non-empty Fields"]
+  REQUEST["POST to /var/homes/{homeId}/get-key/"]
+  BACKEND["Backend: register_or_get_key()"]
+  SUCCESS["200 OK:\nReceive api_key"]
+  SAVE["Save to Local DB\n(DatabaseHelper.insertLogin)"]
+  NAV["Navigate to HomePage"]
+  ERROR["Error:\nShow errorMessage"]
+
+  INPUT --> VALIDATE --> REQUEST
+  REQUEST --> BACKEND -->|status 200| SUCCESS --> SAVE --> NAV
+  REQUEST --> BACKEND -->|status ≠200| ERROR
+  REQUEST --> BACKEND -->|exception| ERROR
+    </div>
+  </div>
+  <div class="flow-text">
+    <h3>Login Flow</h3>
+    <ol>
+      <li>User enters <code>homeId</code>, <code>username</code>, and <code>password</code> in the Flutter UI.</li>
+      <li>Client validates fields are non-empty before sending.</li>
+      <li>POST request sent to <code>/var/homes/{homeId}/get-key/</code>.</li>
+      <li><strong>Backend:</strong> <code>register_or_get_key()</code> checks credentials and returns <code>api_key</code>.</li>
+      <li>On <strong>200 OK</strong>, app calls <code>DatabaseHelper.instance.insertLogin</code> to store <code>homeId</code>, <code>username</code>, and <code>api_key</code>.</li>
+      <li>Navigate to <code>HomePage</code> on success.</li>
+      <li>On <strong>error</strong> or exception, display the <code>errorMessage</code> to the user.</li>
+    </ol>
+    <p>
+      See: 
+      <a href="local/register.py#index" target="_blank">register.py</a>, 
+      <a href="central/views.py#register_or_get_key" target="_blank">register_or_get_key()</a>, 
+      <a href="local/database_helper.dart#index-insertLogin" target="_blank">DatabaseHelper.insertLogin()</a>
+    </p>
+  </div>
+</section>
+<!-- Home Page Flow Section -->
+<section id="home" class="flow-section">
+  <div class="flow-image">
+    <div class="mermaid">
+flowchart TD
+  INIT["initState()"]
+  DB["DatabaseHelper.getHomeId & getApiKey"]
+  FETCH["fetchCameraIds(homeId, apiKey)"]
+  BACKEND["Backend: list_cameras_for_date()\\nGET /api/dates/{date}/cameras/"]
+  PARSE["Parse JSON → List&lt;String&gt; cameraIds"]
+  UI["Render GridView of Camera Tiles"]
+  NAV["BottomNav: switch pages"]
+
+  INIT --> DB --> FETCH
+  FETCH --> BACKEND --> PARSE --> UI
+  UI --> NAV
+    </div>
+  </div>
+  <div class="flow-text">
+    <h3>Home Page Flow</h3>
+    <ol>
+      <li><strong>initState()</strong> calls <code>initBaseUrlAndFetchCameras()</code>.</li>
+      <li>Reads <code>homeId</code> &amp; <code>apiKey</code> from local DB via <code>DatabaseHelper</code>.</li>
+      <li>Calls <code>fetchCameraIds()</code>, which:</li>
+      <ul>
+        <li>Builds URL <code>/var/homes/{homeId}/api/dates/{YYYY‑MM‑DD}/cameras</code>.</li>
+        <li>Sends <code>GET</code> with header <code>Authorization: Api-Key {apiKey}</code>.</li>
+      </ul>
+      <li><strong>Backend:</strong> <code>list_cameras_for_date()</code> checks the date folder and returns JSON:</li>
+      <pre><code>{"cameras": ["cam0","cam1",...]}</code></pre>
+      <li>Client parses into <code>List<String> cameraIds</code> and updates state.</li>
+      <li>UI renders a 2‑column <code>GridView</code> of camera tiles; tapping opens <code>VideoStreamPage</code>.</li>
+      <li>Bottom navigation bar lets the user switch between Home, Events, History, and Settings.</li>
+    </ol>
+    <p>
+      See: 
+      <a href="local/database_helper.dart#index-getHomeId" target="_blank">DatabaseHelper.getHomeId()</a>, 
+      <a href="central/views.py#list_cameras_for_date" target="_blank">list_cameras_for_date()</a>
+    </p>
+  </div>
+</section>
+<!-- Events Inspection Section -->
+<section id="events" class="flow-section">
+  <div class="flow-image">
+    <div class="mermaid">
+flowchart TD
+  INIT["initState() → fetchMetadata()"]
+  META_REQ["GET /api/events/metadata/"]
+  META_BACKEND["Backend: get_events_metadata()"]
+  META_RESP["Return persons, actions, cameras, dates"]
+  LOG_REQ["POST /api/events/inspect/"]
+  LOG_BACKEND["Backend: inspect_events()"]
+  LOG_RESP["Return filtered logs (up to 200)"]
+  DISPLAY["Render ListTiles of event logs"]
+
+  INIT --> META_REQ --> META_BACKEND --> META_RESP --> LOG_REQ --> LOG_BACKEND --> LOG_RESP --> DISPLAY
+    </div>
+  </div>
+  <div class="flow-text">
+    <h3>Events Inspection Flow</h3>
+    <ol>
+      <li><strong>initState()</strong> calls <code>fetchMetadata()</code>.</li>
+      <li>Client sends <code>GET /api/events/metadata/</code> with <code>Authorization: Api-Key</code>.</li>
+      <li><strong>Backend:</strong> <code>get_events_metadata()</code> returns distinct <code>persons</code>, <code>actions</code>, <code>cameras</code>, and <code>dates</code>.</li>
+      <li>User selects filters; client sends <code>POST /api/events/inspect/</code> with JSON body:</li>
+      <pre><code>{
+  "persons": [...],
+  "actions": [...],
+  "camera_ids": [...],
+  "trigger": "true"|"false"|"all",
+  "date": "YYYY-MM-DD"
+}</code></pre>
+      <li><strong>Backend:</strong> <code>inspect_events()</code> applies filters on <code>SegmentActionLog</code>, returns up to 200 logs.</li>
+      <li>Client parses JSON and renders each log as a <code>ListTile</code> (highlighting triggers).</li>
+    </ol>
+    <p>
+      See: 
+      <a href="central/views.py#get_events_metadata" target="_blank">get_events_metadata()</a>, 
+      <a href="central/views.py#inspect_events" target="_blank">inspect_events()</a>, 
+      <a href="local/events_inspection_page.dart#index-fetchMetadata" target="_blank">fetchMetadata()</a>
+    </p>
+  </div>
+</section>
+<section id="history" class="flow-section">
+  <div class="flow-image">
+    <div class="mermaid">
+flowchart TD
+  INIT["initState()\n→ fetchHistoryData()"]
+  FETCH["GET /api/streams/manifest/"]
+  BACKEND["Backend: list_dates() + list_cameras_for_date()\n(manifest handler)"]
+  PARSE["Parse JSON → Map&lt;date, List&lt;camIDs&gt;&gt;"]
+  CALENDAR["Render TableCalendar\n(mark eventDates)"]
+  SELECT["onDaySelected → availableCameras"]
+  BUTTONS["Render Buttons for each camId"]
+  NAV["Navigate to HistoryVideoPlayer\non button tap"]
+
+  INIT --> FETCH --> BACKEND --> PARSE --> CALENDAR
+  CALENDAR --> SELECT --> BUTTONS --> NAV
+    </div>
+  </div>
+  <div class="flow-text">
+    <h3>History Page Flow</h3>
+    <ol>
+      <li><strong>initState()</strong> calls <code>fetchHistoryData()</code>.</li>
+      <li>Client sends <code>GET /api/streams/manifest/</code> with header <code>Authorization: Api-Key</code>.</li>
+      <li><strong>Backend:</strong> Handler calls both <code>list_dates()</code> and <code>list_cameras_for_date()</code> to build the manifest JSON:
+        <pre><code>{
+  "dates": {
+    "YYYY-MM-DD": ["cam1", "cam2", …],
+    …
+  }
+}</code></pre>
+      </li>
+      <li>Client parses into <code>Map&lt;String, List&lt;String&gt;&gt; historyData</code> and extracts <code>Set&lt;DateTime&gt; eventDates</code>.</li>
+      <li>Renders a <code>TableCalendar</code>, marking days in <code>eventDates</code>.</li>
+      <li>On day tap, <code>onDateSelected()</code> sets <code>availableCameras</code> for that date.</li>
+      <li>Renders buttons for each <code>camId</code>; tapping navigates to <code>HistoryVideoPlayerPage</code> with <code>dateStr</code> and <code>camId</code>.</li>
+    </ol>
+    <p>
+      See:
+      <a href="central/views.py#list_dates" target="_blank">list_dates()</a>,
+      <a href="central/views.py#list_cameras_for_date" target="_blank">list_cameras_for_date()</a>,
+      <a href="local/history_page.dart#index-fetchHistoryData" target="_blank">fetchHistoryData()</a>
+    </p>
+  </div>
+</section>
+
+<section id="video-player" class="flow-section">
+  <div class="flow-image">
+    <div class="mermaid">
+flowchart TD
+  INIT["initState() → _initializeVideo()"]
+  DB["Fetch homeId, apiKey from DatabaseHelper"]
+  URLS["Build URLs: /playlist/ & /metadata_index/"]
+  FETCH_PLAYLIST["GET /api/streams/&lt;date&gt;/&lt;camId&gt;/playlist/"]
+  FETCH_METADATA["GET /api/streams/&lt;date&gt;/&lt;camId&gt;/metadata_index/"]
+  PLAYLIST_OK["Extract playlist_url"]
+  INIT_VLC["Init VlcPlayerController.network()"]
+  LOAD_META["Parse JSON metadata"]
+  TICK["_onTick() updates subtitle from segments"]
+  SUBTITLE["Display action as subtitle"]
+  RENDER["Render VlcPlayer + controls"]
+  CONTROLS["Seek, Play, Fullscreen, Feedback"]
+  FEEDBACK["User selects start/end & submits"]
+  POST_FEEDBACK["POST /api/feedback/"]
+
+  INIT --> DB --> URLS
+  URLS --> FETCH_PLAYLIST --> PLAYLIST_OK --> INIT_VLC
+  URLS --> FETCH_METADATA --> LOAD_META
+  INIT_VLC --> RENDER
+  LOAD_META --> TICK --> SUBTITLE
+  RENDER --> CONTROLS --> FEEDBACK --> POST_FEEDBACK
+    </div>
+  </div>
+
+  <div class="flow-text">
+    <h3>Video Player Page Flow</h3>
+    <ol>
+      <li><code>initState()</code> triggers <code>_initializeVideo()</code>.</li>
+      <li><strong>DatabaseHelper</strong> fetches <code>homeId</code>, <code>apiKey</code>, and <code>username</code>.</li>
+      <li>Two URLs are built:
+        <ul>
+          <li><code>/playlist/</code> → fetches HLS <code>index.m3u8</code> URL</li>
+          <li><code>/metadata_index/</code> → fetches segment metadata JSON</li>
+        </ul>
+      </li>
+      <li>The playlist URL is passed into <code>VlcPlayerController</code> for video playback.</li>
+      <li>Metadata is parsed into <code>segmentMetadataList</code>.</li>
+      <li><code>_onTick()</code> runs every frame, maps video time → metadata index → updates subtitle.</li>
+      <li>Subtitle displays <code>action</code> (e.g., "Walking", "Sitting").</li>
+      <li>Controls include:
+        <ul>
+          <li>Play/Pause, Rewind/Forward</li>
+          <li>Fullscreen toggle</li>
+          <li>Set Feedback Start/End flags</li>
+        </ul>
+      </li>
+      <li>Feedback is sent as JSON to <code>/api/feedback/</code> with video URL, time range, type, and comments.</li>
+    </ol>
+
+    <p><strong>References:</strong></p>
+    <ul>
+      <li><code>views.py → playlist_redirect()</code>, <code>metadata_index()</code></li>
+      <li><code>history_video_player.dart → _initializeVideo(), _onTick(), _submitFeedback()</code></li>
+    </ul>
+  </div>
+</section>
+
+
+<section id="api-settings" class="flow-section">
+  <div class="flow-image">
+    <div class="mermaid">
+      flowchart TD
+        INIT["initState() → fetchApiKeyDetails()"]
+        DB["Get homeId, apiKey, username\nfrom DatabaseHelper"]
+        REQUEST["POST /view-api-key/\nAuthorization: Api-Key"]
+        RESPONSE["Returns username, api_key, created_at"]
+        DISPLAY["Mask & display API key info"]
+        REGEN_BTN["Tap 'Regenerate API Key'"]
+        PROMPT["Prompt password dialog"]
+        SUBMIT["Submit password"]
+        REQ_REGEN["POST /regenerate-api-key/\n(username + password)"]
+        REGEN_RESP["Returns new api_key"]
+        UPDATE_DB["Update local DB\n→ call fetchApiKeyDetails()"]
+
+        INIT --> DB --> REQUEST --> RESPONSE --> DISPLAY
+        DISPLAY --> REGEN_BTN --> PROMPT --> SUBMIT --> REQ_REGEN --> REGEN_RESP --> UPDATE_DB --> DISPLAY
+    </div>
+  </div>
+
+  <div class="flow-text">
+    <h3>API Key Settings Page Flow</h3>
+    <ol>
+      <li><code>initState()</code> triggers <strong><code>fetchApiKeyDetails()</code></strong> when page opens.</li>
+      <li><code>DatabaseHelper</code> fetches the <code>homeId</code>, <code>apiKey</code>, and <code>username</code> from local storage.</li>
+      <li>Client sends:
+        <pre>POST /view-api-key/</pre>
+        with header <code>Authorization: Api-Key &lt;key&gt;</code> and body <code>{ username }</code>.
+      </li>
+      <li>Backend returns:
+        <pre>{
+  "username": "...",
+  "api_key": "...",
+  "created_at": "...",
+  "description": ...
+}</pre>
+      </li>
+      <li>The API key is masked on UI (e.g., <code>abcd******xyz</code>), and all details are displayed.</li>
+      <li>When the user taps "Regenerate API Key":
+        <ul>
+          <li>A password prompt is shown using a modal dialog.</li>
+          <li>On submission, it sends:
+            <pre>POST /regenerate-api-key/</pre>
+            with form data: <code>username</code> and <code>password</code>.
+          </li>
+        </ul>
+      </li>
+      <li>If the backend validates the user:
+        <ul>
+          <li>Returns a new <code>api_key</code></li>
+          <li>That key is saved to the local database.</li>
+          <li><code>fetchApiKeyDetails()</code> is triggered again to refresh the UI.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <p><strong>Relevant Files:</strong></p>
+    <ul>
+      <li><code>settings/api_key_settings.dart</code></li>
+      <li><code>central/views.py → view_api_key(), regenerate_api_key()</code></li>
+      <li><code>database_helper.dart → getLogin(), updateLoginApiKey()</code></li>
+    </ul>
+  </div>
+</section>
+
+<section id="camera-settings" class="flow-section">
+  <div class="flow-image" >
+    <div class="mermaid"   style="transform: scale(2.2);">
+flowchart TD
+  A_INIT["initState() → fetchCameras()"]
+  B_GET_DB["Get homeId & apiKey from DatabaseHelper"]
+  C_LIST_CAM["POST /api/cameras/"]
+  D_DISPLAY["Display ListView of cameras"]
+
+  E_BTN_ADD["Click Add Button"]
+  F_DIALOG_ADD["Enter Source & Name in Dialog"]
+  G_ADD_REQ["POST /api/cameras/add/ [source, name]"]
+  H_REFRESH_ADD["If 201 → fetchCameras()"]
+
+  I_BTN_EDIT["Long-Press → Edit"]
+  J_DIALOG_EDIT["Edit Source & Name in Dialog"]
+  K_EDIT_REQ["POST /api/cameras/&lt;id&gt;/edit/ [source, name]"]
+  L_REFRESH_EDIT["If 200 → fetchCameras()"]
+
+  M_BTN_DELETE["Long-Press → Delete"]
+  N_DELETE_REQ["POST /api/cameras/&lt;id&gt;/delete/"]
+  O_REFRESH_DELETE["If 200 → fetchCameras()"]
+
+  P_TOGGLE["Toggle Camera Switch"]
+  Q_TOGGLE_REQ["POST /api/cameras/&lt;id&gt;/toggle/"]
+  R_REFRESH_TOGGLE["If 200 → fetchCameras()"]
+
+  A_INIT --> B_GET_DB --> C_LIST_CAM --> D_DISPLAY
+  D_DISPLAY --> E_BTN_ADD --> F_DIALOG_ADD --> G_ADD_REQ --> H_REFRESH_ADD --> D_DISPLAY
+  D_DISPLAY --> I_BTN_EDIT --> J_DIALOG_EDIT --> K_EDIT_REQ --> L_REFRESH_EDIT --> D_DISPLAY
+  D_DISPLAY --> M_BTN_DELETE --> N_DELETE_REQ --> O_REFRESH_DELETE --> D_DISPLAY
+  D_DISPLAY --> P_TOGGLE --> Q_TOGGLE_REQ --> R_REFRESH_TOGGLE --> D_DISPLAY
+    </div>
+  </div>
+
+  <div class="flow-text">
+    <h3>Camera Settings Page Flow</h3>
+
+    <ol>
+      <li><strong>Initialization:</strong>
+        <ul>
+          <li><code>initState()</code> triggers <code>fetchCameras()</code> on page load.</li>
+          <li>It retrieves <code>homeId</code> and <code>apiKey</code> using <code>DatabaseHelper</code>.</li>
+          <li>Makes a <code>POST</code> request to:
+            <pre>/api/cameras/</pre>
+            to fetch all available camera records.
+          </li>
+          <li>The response contains a list of cameras with fields like:
+            <code>[{id, name, source, mac_id, is_turned_on}, ...]</code>
+          </li>
+          <li>These are shown in a <code>ListView</code> in the UI.</li>
+        </ul>
+      </li>
+
+      <li><strong>Adding a Camera:</strong>
+        <ul>
+          <li>FloatingActionButton (‘+’) opens a dialog to input the <code>source</code> and optional <code>name</code>.</li>
+          <li>Sends a <code>POST</code> request to:
+            <pre>/api/cameras/add/</pre>
+            with:
+            <pre>{ "source": "rtsp://...", "name": "Garage" }</pre>
+          </li>
+          <li>Backend extracts IP, generates MAC, avoids duplicate cameras, and stores new entry.</li>
+          <li>If status is <code>201 Created</code>, <code>fetchCameras()</code> is called again to refresh UI.</li>
+        </ul>
+      </li>
+
+      <li><strong>Editing a Camera:</strong>
+        <ul>
+          <li>Long-press on any camera → Tap “Edit”.</li>
+          <li>Dialog appears with current source and name prefilled.</li>
+          <li>After editing, sends:
+            <pre>POST /api/cameras/&lt;id&gt;/edit/</pre>
+            with updated fields.
+          </li>
+          <li>Backend updates the entry and recalculates MAC if needed.</li>
+          <li>On success, UI is refreshed with <code>fetchCameras()</code>.</li>
+        </ul>
+      </li>
+
+      <li><strong>Deleting a Camera:</strong>
+        <ul>
+          <li>Long-press → Tap “Delete”.</li>
+          <li>Sends:
+            <pre>POST /api/cameras/&lt;id&gt;/delete/</pre>
+          </li>
+          <li>Backend removes the camera if found.</li>
+          <li>On 200 OK, camera list is refreshed.</li>
+        </ul>
+      </li>
+
+      <li><strong>Toggling Camera ON/OFF:</strong>
+        <ul>
+          <li>Toggling switch sends:
+            <pre>POST /api/cameras/&lt;id&gt;/toggle/</pre>
+          </li>
+          <li>Backend flips the <code>is_turned_on</code> flag.</li>
+          <li>UI updates by re-fetching the camera list.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h4>Relevant Files</h4>
+    <ul>
+      <li><strong>Flutter:</strong> <code>camera_settings_page.dart</code></li>
+      <li><strong>Django (views.py):</strong>
+        <ul>
+          <li><code>add_camera</code> → <code>/api/cameras/add/</code></li>
+          <li><code>edit_camera</code> → <code>/api/cameras/&lt;id&gt;/edit/</code></li>
+          <li><code>delete_camera</code> → <code>/api/cameras/&lt;id&gt;/delete/</code></li>
+          <li><code>toggle_camera</code> → <code>/api/cameras/&lt;id&gt;/toggle/</code></li>
+          <li><code>list_cameras</code> → <code>/api/cameras/</code></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section id="marketplace-page" class="flow-section">
+  <style>
+  </style>
+
+  <div class="flow-image">
+    <div class="mermaid">
+flowchart TD
+  subgraph Flutter_Client[Flutter Client]
+    INIT["initState()\nfetchMarketplaceModels()"]
+    GET_CRED["Get homeId & apiKey\nfrom DatabaseHelper"]
+    CALL_LOCAL["Call: /api/proxy/fetch_models/"]
+    SET_STATE["setState(models)"]
+    UI_LIST["Display ListView.builder()"]
+    CLICK_CARD["onTap → ModelDetailPage()"]
+    CALL_DETAIL_PROXY["Call: /api/proxy/fetch_model_by_id/"]
+    SHOW_DETAIL["Render ModelDetailPage()"]
+  end
+
+  subgraph Local_Server[Local Server (Agent - Django)]
+    LOAD_KEYS["Load house_id + secret_key"]
+    HASH_AUTH["Compute SHA256(house_id + secret_key)"]
+    PROXY_REQ["GET → /vendors/models/public/"]
+    HANDLE_RESP["Return JSON to Flutter"]
+    LOAD_KEYS2["Recompute Auth Keys"]
+    PROXY_DETAIL_REQ["GET → /vendors/models/model_detail/"]
+    HANDLE_DETAIL_RESP["Return Detail JSON"]
+  end
+
+  subgraph Central_Server[Central Server (Vendor)]
+    VALIDATE_HASH["Verify house_id & hash"]
+    RETURN_MODELS["Return List of Public Models"]
+    RETURN_DETAIL["Return Model Detail JSON"]
+  end
+
+  %% Flow for Public Model List
+  INIT --> GET_CRED --> CALL_LOCAL
+  CALL_LOCAL --> LOAD_KEYS --> HASH_AUTH --> PROXY_REQ --> VALIDATE_HASH --> RETURN_MODELS --> HANDLE_RESP --> SET_STATE --> UI_LIST --> CLICK_CARD --> CALL_DETAIL_PROXY
+  %% Flow for Model Detail Fetch
+  CALL_DETAIL_PROXY --> LOAD_KEYS2 --> PROXY_DETAIL_REQ --> RETURN_DETAIL --> HANDLE_DETAIL_RESP --> SHOW_DETAIL
+    </div>
+  </div>
+
+  <div class="flow-text">
+    <h3>Model Marketplace – End-to-End Flow Explanation</h3>
+
+    <ol>
+      <li><strong>Flutter App:</strong>
+        <ul>
+          <li><code>fetchMarketplaceModels()</code> is triggered during <code>initState()</code>.</li>
+          <li>Credentials like <code>homeId</code> and <code>apiKey</code> are fetched via <code>DatabaseHelper</code>.</li>
+          <li>Calls <code>/api/proxy/fetch_models/</code> on the local server to get models.</li>
+        </ul>
+      </li>
+
+      <li><strong>Local Server (Django Agent):</strong>
+        <ul>
+          <li>Loads <code>house_id</code> and <code>secret_key</code> from local config.</li>
+          <li>Computes an authentication hash: <code>SHA256(house_id + secret_key)</code>.</li>
+          <li>Sends request to <code>/vendors/models/public/</code> on the central server with proper headers.</li>
+        </ul>
+      </li>
+
+      <li><strong>Central Server (Vendor):</strong>
+        <ul>
+          <li>Verifies <code>house_id</code> and <code>auth_hash</code> using <code>HouseHashAuth</code>.</li>
+          <li>Returns list of public models.</li>
+        </ul>
+      </li>
+
+      <li><strong>Back to Flutter:</strong>
+        <ul>
+          <li>Local agent returns JSON of models to Flutter.</li>
+          <li>UI updates via <code>setState(models)</code> and displays them in a <code>ListView.builder()</code>.</li>
+        </ul>
+      </li>
+
+      <li><strong>Fetching Model Details:</strong>
+        <ul>
+          <li>On tap, Flutter sends <code>{model_id}</code> to <code>/api/proxy/fetch_model_by_id/</code>.</li>
+          <li>Local server repeats the same hash authentication and proxies request to central.</li>
+          <li>Central responds with full model + version metadata.</li>
+          <li>Flutter displays it on <code>ModelDetailPage</code>.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h4>Key Function Links</h4>
+    <ul>
+      <li><a href="local/proxy.py#proxy_fetch_public_models" target="_blank">proxy_fetch_public_models()</a> – Local proxy for model list</li>
+      <li><a href="central/views.py#PublicModelListAPI" target="_blank">PublicModelListAPI.get()</a> – Central API to serve model list</li>
+      <li><a href="local/proxy.py#proxy_fetch_model_by_id" target="_blank">proxy_fetch_model_by_id()</a> – Local proxy for model details</li>
+      <li><a href="central/views.py#ModelDetailAPI" target="_blank">ModelDetailAPI.get()</a> – Central API for full model info</li>
+      <li><a href="flutter/lib/pages/model_detail_page.dart#ModelDetailPage" target="_blank">ModelDetailPage</a> – Flutter detail view</li>
+    </ul>
+  </div>
+</section>
+
+<!-- Model Detail Graph Section -->
+<section id="model-detail-graph" class="flow-section">
+  <div class="flow-image">
+    <div class="mermaid" style="transform: scale(2);  /* Try values like 1.2, 1.5, 2.0 */
+    ">
+graph TD
+    subgraph Client [Flutter App]
+        A1["User taps on a model in ModelDetailPage"]
+        A2["fetchModelDetails() is triggered"]
+        A3["POST /homes/{home_id}/trainingspace/model_details/"]
+    end
+
+    subgraph LocalServer [Local Proxy Server]
+        B1["proxy_fetch_model_by_id()"]
+        B2["Load house_id and secret_key from config"]
+        B3["Compute SHA256(house_id + secret_key)"]
+        B4["GET /vendors/models/model_detail/ with model_id and headers"]
+    end
+
+    subgraph CentralServer [Central Vendor API]
+        C1["ModelDetailAPI"]
+        C2["Authenticate headers via HouseHashAuth"]
+        C3["Fetch ModelEntry by model_id"]
+        C4["Check model.visibility"]
+        C5["Return model metadata + versions JSON"]
+    end
+
+    subgraph ClientUI [Flutter Display]
+        D1["Render model name, description, tag"]
+        D2["Iterate over versions"]
+        D3["Show download buttons per version"]
+    end
+
+    A1 --> A2 --> A3 --> B1
+    B1 --> B2 --> B3 --> B4 --> C1
+    C1 --> C2 --> C3 --> C4 --> C5
+    C5 --> B1 --> A2 --> D1 --> D2 --> D3
+
+    </div>
+  </div>
+
+  <div class="flow-text">
+    <h3>Model Detail Graph and Explanation</h3>
+    <ol>
+      <li>
+        <strong>Client (Flutter App):</strong><br>
+        When the user taps a model from the list, the Flutter widget <code>ModelDetailPage</code> is loaded. It immediately calls <code>fetchModelDetails()</code>. This function constructs an HTTP <code>POST</code> request to the endpoint:
+        <pre>/var/homes/{home_id}/trainingspace/model_details/</pre>
+        It includes the <code>model_id</code> in the request body and sends an <code>Api-Key</code> in the headers for local server authentication.
+      </li>
+
+      <li>
+        <strong>Local Server:</strong><br>
+        The request hits the Django-based proxy function <code>proxy_fetch_model_by_id()</code>.
+        <ul>
+          <li>It loads <code>house_id</code> and <code>secret_key</code> from local configuration using <code>config.load()</code>.</li>
+          <li>It computes a SHA-256 hash of <code>house_id + secret_key</code> to use as <code>X-Auth-Hash</code>.</li>
+          <li>It sends a secured <code>GET</code> request to the central API endpoint <code>/vendors/models/model_detail/</code> with:</li>
+          <ul>
+            <li><code>X-House-ID</code>: the house identifier</li>
+            <li><code>X-Auth-Hash</code>: computed hash to verify house ownership</li>
+            <li><code>Content-Type</code>: <code>application/json</code></li>
+            <li>Body: <code>{"model_id": "..."}</code></li>
+          </ul>
+        </ul>
+      </li>
+
+      <li>
+        <strong>Central Server:</strong><br>
+        The request is routed to the DRF-based API class <code>ModelDetailAPI</code> which:
+        <ul>
+          <li>Authenticates the house using the <code>HouseHashAuth</code> class which verifies that the hash matches the known <code>house_id</code> and <code>secret_key</code>.</li>
+          <li>Parses the <code>model_id</code> from the JSON request.</li>
+          <li>Fetches the corresponding <code>ModelEntry</code> from the database, along with all related <code>versions</code> using Django ORM's <code>prefetch_related</code>.</li>
+          <li>If the model's visibility is <code>PRIVATE</code>, it returns a <code>403 Forbidden</code>.</li>
+          <li>If the model is <code>PUBLIC</code>, it builds a response JSON that includes:</li>
+          <ul>
+            <li>model_id, name, tag, visibility, vendor_userid, upload_date</li>
+            <li>And a list of versions: version_id, version_name, description, compatibility, size, upload_date</li>
+          </ul>
+        </ul>
+      </li>
+
+      <li>
+        <strong>Client Display:</strong><br>
+        The response is sent back to the Flutter app. Inside <code>ModelDetailPage</code>, the following happens:
+        <ul>
+          <li>Model information (name, tag, visibility, description) is rendered using Flutter widgets.</li>
+          <li>Each version is shown using an <code>ExpansionTile</code>, displaying its size, compatibility, and upload date.</li>
+          <li>A download button is provided, which links to the <code>/containers/switch/</code> endpoint to download/switch to that version.</li>
+        </ul>
+      </li>
+
+      <li>
+        <strong>Error Handling:</strong><br>
+        <ul>
+          <li>If the config is missing or auth hash fails — local server returns <code>500</code>.</li>
+          <li>If the model is not found or private — central returns <code>403</code> or <code>404</code>.</li>
+          <li>All errors are shown using Flutter snackbars.</li>
+        </ul>
+      </li>
+    </ol>
+    <p>
+      See:
+      <a href="local/views.py#proxy_fetch_model_by_id" target="_blank">proxy_fetch_model_by_id()</a>, 
+      <a href="central/views.py#ModelDetailAPI" target="_blank">ModelDetailAPI</a>, 
+      <a href="client/model_detail_page.dart#fetchModelDetails" target="_blank">ModelDetailPage.fetchModelDetails()</a>
+    </p>
+  </div>
+</section>
+<section id="hls-pipeline" class="flow-section">
+  <style>
+
+  </style>
+
+  <div class="flow-image">
+    <div class="mermaid" style="transform: scale(2); ">
+flowchart TD
+  subgraph INIT[Camera Init]
+    START["Django Command:\nrun_hls_pipeline.py"]
+    GET_CAMS["Get all Camera objects\n(is_turned_on=True)"]
+    THREADS["Start Thread: camera_feed + camera_watcher\nper camera"]
+    WORKERS["Start ThreadPoolExecutor\nwith inference workers"]
+  end
+
+  subgraph CAPTURE_SEGMENT[Capture_and_Segment_ts]
+    FEED["OpenCV: Capture Frame"]
+    PIPE["Pipe Frame to FFmpeg"]
+    HLS["FFmpeg writes seg_XXXXX.ts\n(index.m3u8)"]
+  end
+
+  subgraph WATCH_SEGMENTS[Watch_New_Segments]
+    WATCH["Watcher:\nDetect new .ts file"]
+    QUEUE["Push to inference_q"]
+  end
+
+  subgraph INFER_WORKER[Inference_Worker]
+    GET_TASK["inference_q.get()"]
+    MODEL["predict_ts_clip_label()"]
+    META["Generate segment JSON\n(timestamp, action, persons, uri)"]
+    LOG_DB["Log to SegmentActionLog"]
+    LOG_CSV["Append to segment_logs.csv"]
+    SIDE_JSON["Write seg_XXXXX.json"]
+    META_INDEX["Update metadata_index.json"]
+  end
+
+  START --> GET_CAMS --> THREADS
+  THREADS --> FEED --> PIPE --> HLS
+  HLS --> WATCH --> QUEUE
+  WORKERS --> GET_TASK --> MODEL --> META
+  QUEUE --> GET_TASK
+  META --> SIDE_JSON
+  META --> LOG_DB
+  META --> LOG_CSV
+  META --> META_INDEX
+</div>
+  </div>
+
+  <div class="flow-text">
+    <h3>HLS Processing Pipeline – Full Flow Overview</h3>
+    <ol>
+      <li><strong>Pipeline Start:</strong> Django command <code>run_hls_pipeline</code> is launched. It gets all active cameras and spawns:
+        <ul>
+          <li><code>camera_feed</code>: uses OpenCV to read frames and stream them into FFmpeg.</li>
+          <li><code>camera_watcher</code>: monitors generated <code>.ts</code> segments.</li>
+          <li>Worker threads (via ThreadPoolExecutor) to handle per-segment inference.</li>
+        </ul>
+      </li>
+      <li><strong>Segment Creation:</strong> FFmpeg generates HLS segments from live video feed.</li>
+      <li><strong>Watcher:</strong> Watches the output directory for new <code>.ts</code> files and enqueues them for processing.</li>
+      <li><strong>Inference:</strong>
+        <ul>
+          <li>Worker thread picks up task from queue.</li>
+          <li>Model runs inference on sampled frames using <code>MobileNetV2</code>.</li>
+          <li>Logs are saved to DB (<code>SegmentActionLog</code>), CSV, and JSON sidecars.</li>
+          <li>Updates the <code>metadata_index.json</code> to maintain metadata chronology.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <p><strong>See also:</strong></p>
+    <ul>
+      <li><code>streams.pipeline.hls_pipeline.py</code></li>
+      <li><code>streams.pipeline.utils.py</code></li>
+      <li><code>core/management/commands/run_hls_pipeline.py</code></li>
+    </ul>
+  </div>
+</section>
+
+
+  </main>
+  <footer>
+    &copy; 2025 Surveillance App Documentation
+  </footer>
+
+  <script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

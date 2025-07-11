@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the feedbackTypes property from the video_stream_page library, for the Dart programming language.">
+  <title>feedbackTypes property - video_stream_page library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../static-assets/styles.css?v1">
+  <link rel="icon" href="../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../index.html">surveillance_app</a></li>
+    <li><a href="../pages_video_stream_page">pages\video_stream_page.dart</a></li>
+    <li class="self-crumb">feedbackTypes property</li>
+  </ol>
+  <div class="self-name">feedbackTypes</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <div class="toggle" id="theme-button" title="Toggle brightness">
+    <label for="theme">
+      <input type="checkbox" id="theme" value="light-theme">
+      <span id="dark-theme-button" class="material-symbols-outlined">
+        dark_mode
+      </span>
+      <span id="light-theme-button" class="material-symbols-outlined">
+        light_mode
+      </span>
+    </label>
+  </div>
+</header>
+<main>
+  <div
+      id="dartdoc-main-content"
+      class="main-content"
+      data-above-sidebar="pages_video_stream_page&#47;pages_video_stream_page-library-sidebar.html"
+      data-below-sidebar="">
+      <div>
+<h1><span class="kind-top-level-property">feedbackTypes</span> top-level property 
+ 
+</h1></div>
+
+        <section class="multi-line-signature">
+          
+          <a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span>
+          <span class="name ">feedbackTypes</span>
+          <div class="features"><span class="feature">final</span></div>
+
+        </section>
+        
+<section class="desc markdown">
+  <p>A page to stream live surveillance video, display real‑time subtitles, and submit feedback on detected actions.</p>
+<p><strong>Parameters (Widget):</strong></p>
+<ul>
+<li><code>camId</code> (String, required): Identifier of the camera to stream.</li>
+<li><code>dateStr</code> (String, required): Date (<code>YYYY-MM-DD</code>) for the requested stream.</li>
+</ul>
+<p><strong>Fields:</strong></p>
+<ul>
+<li><code>_controller</code> (VlcPlayerController?): Controls playback of the HLS stream.</li>
+<li><code>_initialized</code> (bool): True once video URL and metadata are loaded.</li>
+<li><code>metadataCache</code> (Map&lt;String, List<dynamic>&gt;): Caches per‐segment metadata JSON.</dynamic></li>
+<li><code>segmentMetadataList</code> (List&lt;Map&lt;String,dynamic&gt;&gt;): List of metadata entries for each segment.</li>
+<li><code>currentSubtitle</code> (String?): Contains the current action subtitle based on playback position.</li>
+</ul>
+<p><strong>Initialization (<code>_initializeVideo()</code>):</strong></p>
+<ul>
+<li><strong>Endpoint:</strong><br>
+GET <a href="https://services.iittp.ac.in/var/homes/%7BhomeId%7D/api/streams/%7BdateStr%7D/%7BcamId%7D/playlist/">https://services.iittp.ac.in/var/homes/{homeId}/api/streams/{dateStr}/{camId}/playlist/</a></li>
+<li><strong>Request Headers:</strong>
+<ul>
+<li><code>Authorization</code>: <code>Api-Key &lt;apiKey&gt;</code></li>
+</ul>
+</li>
+<li><strong>Responses:</strong>
+<ul>
+<li><strong>200 OK</strong>
+<pre class="language-json"><code class="language-json">{ "playlist_url": "https://…/stream.m3u8" }
+</code></pre>
+<ul>
+<li>Loads <code>playlist_url</code> into <code>_controller</code>.</li>
+</ul>
+</li>
+<li><strong>4xx / 5xx Errors</strong>
+<ul>
+<li>Logs <code>[ERROR] Failed to fetch playlist: &lt;statusCode&gt;</code> or exception.</li>
+<li>Does not initialize playback.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><strong>Metadata Loading (<code>_loadFullSegmentMetadata()</code>):</strong></p>
+<ul>
+<li><strong>Endpoint:</strong><br>
+GET <a href="https://services.iittp.ac.in/var/homes/%7BhomeId%7D/api/streams/%7BdateStr%7D/%7BcamId%7D/metadata_index">https://services.iittp.ac.in/var/homes/{homeId}/api/streams/{dateStr}/{camId}/metadata_index</a></li>
+<li><strong>Headers:</strong> Same as above</li>
+<li><strong>Responses:</strong>
+<ul>
+<li><strong>200 OK</strong>
+<pre class="language-json"><code class="language-json">{ "segments": [ { "index":0, "action":"…", … }, … ] }
+</code></pre>
+<ul>
+<li>Populates <code>segmentMetadataList</code> for subtitle look‑ups.</li>
+</ul>
+</li>
+<li><strong>4xx / 5xx Errors</strong>
+<ul>
+<li>Logs <code>[ERROR] Failed to fetch metadata: &lt;statusCode&gt;</code> or exception.</li>
+<li>Leaves <code>segmentMetadataList</code> empty.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><strong>Playback Updates (<code>_onTick()</code> via Ticker):</strong></p>
+<ul>
+<li>Polls <code>_controller</code> for position and duration every frame.</li>
+<li>Updates <code>_position</code>, <code>_duration</code>.</li>
+<li>Computes subtitle index = <code>positionMs ~/ 5000</code> and sets <code>currentSubtitle</code> from <code>segmentMetadataList</code>.</li>
+</ul>
+<p><strong>Controls:</strong></p>
+<ul>
+<li><code>_togglePlayPause()</code>: Pauses or resumes playback.</li>
+<li><code>_seekTo(ms)</code>: Seeks to the given time in milliseconds.</li>
+<li><code>_forward()</code>, <code>_rewind()</code>: ±10 s jumps.</li>
+<li><code>_toggleFullScreen()</code>: Toggles immersive mode, reinitializes player, restores position.</li>
+</ul>
+<p><strong>Feedback Submission (<code>_submitFeedback()</code>):</strong></p>
+<ul>
+<li><strong>Endpoint:</strong><br>
+POST <a href="https://services.iittp.ac.in/var/homes/%7BhomeId%7D/api/feedback">https://services.iittp.ac.in/var/homes/{homeId}/api/feedback</a></li>
+<li><strong>Request Body (application/json):</strong>
+<pre class="language-json"><code class="language-json">{
+  "video_url": "&lt;stream_url&gt;",
+  "start_time": "HH:MM:SS",
+  "end_time":   "HH:MM:SS",
+  "user_id":    "&lt;username&gt;",
+  "feedback_text": "&lt;comment&gt;",
+  "feedback_type": "&lt;Missing Action|Wrong Label|Noisy|Irrelevant&gt;"
+}
+</code></pre>
+</li>
+<li><strong>Responses:</strong>
+<ul>
+<li><strong>200 OK</strong> or <strong>201 Created</strong>: Shows “Feedback submitted successfully” SnackBar.</li>
+<li><strong>Other Codes</strong>: Shows “Submission failed: <statuscode>” SnackBar.</statuscode></li>
+<li><strong>Exceptions</strong>: Shows “Error submitting feedback: <error>” SnackBar.</error></li>
+</ul>
+</li>
+</ul>
+</section>
+
+        
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">&#47;&#47; Define a list of feedback types for user input
+final List&lt;String&gt; feedbackTypes = [&#39;Missing Action&#39;, &#39;Wrong Label&#39;, &#39;Noisy&#39;, &#39;Irrelevant&#39;];</code></pre>
+</section>
+
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../index.html">surveillance_app</a></li>
+    <li><a href="../pages_video_stream_page">video_stream_page</a></li>
+    <li class="self-crumb">feedbackTypes property</li>
+</ol>
+
+    <h5>video_stream_page library</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-left-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  </div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    surveillance_app
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../static-assets/highlight.pack.js?v1"></script>
+<script src="../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

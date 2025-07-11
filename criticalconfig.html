@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Critical Configuration</title>
+  <style>
+    /* Base styles */
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      background-color: #f5f7fa;
+      color: #2c3e50;
+    }
+    header {
+      background-color: #34495e;
+      color: #ecf0f1;
+      padding: 1.5rem 2rem;
+      text-align: center;
+      border-bottom: 4px solid #1abc9c;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2.2rem;
+      letter-spacing: 1px;
+    }
+    header p {
+      margin: 0.5rem 0 0;
+      font-size: 1rem;
+      opacity: 0.8;
+    }
+    nav {
+      background: #ecf0f1;
+      padding: 2rem 1rem;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 240px;
+      border-right: 1px solid #dfe6e9;
+      overflow-y: auto;
+    }
+    nav h3 {
+      margin-top: 0;
+      color: #16a085;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    nav ul {
+      list-style: none;
+      padding: 0;
+      margin: 1.5rem 0 0;
+    }
+    nav li {
+      margin: 0.75rem 0;
+    }
+    nav a {
+      color: #34495e;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.3s;
+    }
+    nav a:hover {
+      color: #1abc9c;
+    }
+    main {
+      margin-left: 260px;
+      padding: 2.5rem;
+      max-width: 1000px;
+    }
+    section {
+      margin-bottom: 3rem;
+    }
+    h2 {
+      color: #1abc9c;
+      border-bottom: 2px solid #dfe6e9;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+      font-size: 1.6rem;
+    }
+    .file-info {
+      font-size: 0.9rem;
+      color: #7f8c8d;
+      margin-bottom: 0.8rem;
+    }
+    pre {
+      background: #2d3436;
+      color: #dfe6e9;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.95rem;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    }
+    code {
+      font-family: 'Source Code Pro', monospace;
+    }
+    ul {
+      margin: 0.5rem 0 0 1.5rem;
+      line-height: 1.5;
+    }
+    .note {
+      background: #dff9fb;
+      border-left: 4px solid #22a6b3;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <h3>Contents</h3>
+    <ul>
+      <li><a href="#file1">1. agent/register.py</a></li>
+      <li><a href="#file2">2. agent/tunnel_agent.py</a></li>
+      <li><a href="#file3">3. hls_pipeline.py</a></li>
+      <li><a href="#env-vars">4. Docker Env Vars</a></li>
+      <li><a href="#gpu-note">5. GPU Deployment Note</a></li>
+      <li><a href="#file4">6. settings.py</a></li>
+    </ul>
+  </nav>
+  <header>
+    <h1>Critical Configuration</h1>
+    <p>Local Server Deployment (Agent + Django + HLS)</p>
+  </header>
+  <main>
+    <section id="file1">
+      <h2>1. agent/register.py</h2>
+      <div class="file-info">Path: <code>agent/register.py</code> | Line: <strong>16</strong></div>
+      <pre><code>CENTRAL_REG_URL = "https://services.iittp.ac.in/var/tunnel/api/register_or_get_id/"</code></pre>
+      <ul>
+        <li>Replace <code>services.iittp.ac.in</code> with your central server domain.</li>
+        <li>Protocol must be <code>http://</code> or <code>https://</code>.</li>
+      </ul>
+    </section>
+    <section id="file2">
+      <h2>2. agent/tunnel_agent.py</h2>
+      <div class="file-info">Path: <code>agent/tunnel_agent.py</code> | Line: <strong>26</strong></div>
+      <pre><code>CENTRAL_WS = "ws://10.23.8.207:5090/ws/tunnel/"</code></pre>
+      <p>Should be updated to:</p>
+      <pre><code>CENTRAL_WS = "wss://services.iittp.ac.in/var/ws/tunnel/"</code></pre>
+      <div class="note">
+        <strong>Apache Reverse Proxy:</strong>
+        <ul>
+          <li>Redirect <code>wss://services.iittp.ac.in/var</code> → <code>ws://10.23.8.207:5090/</code></li>
+          <li>Enable Apache <code>mod_proxy_wstunnel</code>.</li>
+        </ul>
+      </div>
+    </section>
+    <section id="file3">
+      <h2>3. streams/management/commands/hls_pipeline.py</h2>
+      <div class="file-info">Path: <code>streams/management/commands/hls_pipeline.py</code> | Lines: <strong>36–40</strong></div>
+      <pre><code>SEGMENT_DURATION = 5         # Duration of each .ts segment (seconds)
+OUTPUT_HEIGHT = 360          # HLS output video height
+OUTPUT_BITRATE = "400k"      # Bitrate for HLS output
+REFRESH_INTERVAL = 30        # Interval (sec) to refresh camera state
+INFERENCE_WORKERS = 2        # Parallel inference workers</code></pre>
+      <ul>
+        <li>Adjust these values based on network and performance needs.</li>
+      </ul>
+    </section>
+    <section id="env-vars">
+      <h2>4. Docker Compose — Environment Variables</h2>
+      <div class="file-info">Service: <code>django</code> in <code>docker-compose.yml</code></div>
+      <ul>
+        <li><code>DJANGO_SETTINGS_MODULE</code> (default: <code>video_streaming.settings</code>)</li>
+        <li><code>REGISTRATION_TOKEN</code> (one-time token per house/user)</li>
+        <li><code>TZ</code> (e.g., <code>Asia/Kolkata</code>)</li>
+        <li><code>NETWORK</code> (Docker network name, e.g., <code>internal_net</code>)</li>
+        <li><code>DJANGO_SUPERUSER_USERNAME</code> (admin username)</li>
+        <li><code>DJANGO_SUPERUSER_EMAIL</code> (admin email address)</li>
+        <li><code>DJANGO_SUPERUSER_PASSWORD</code> (strong admin password)</li>
+      </ul>
+    </section>
+    <section id="gpu-note">
+      <h2>5. Deployment GPU Note</h2>
+      <div class="file-info">Within <code>docker-compose.yml</code></div>
+      <pre><code>deploy:
+  resources:
+    reservations:
+      devices:
+        - capabilities: [gpu]
+# runtime: nvidia</code></pre>
+      <ul>
+        <li>Remove/comment <code>runtime: nvidia</code> for macOS deployments.</li>
+      </ul>
+    </section>
+    <section id="file4">
+      <h2>6. video_streaming/settings.py</h2>
+      <div class="file-info">Path: <code>video_streaming/settings.py</code> | Lines: <strong>148–156</strong></div>
+      <pre><code>CENTRAL = {
+    'house_id': get_house_id(),
+    'secret_key': get_secret_key(),
+    'base_url': os.getenv(
+        'CENTRAL_BASE_URL',
+        'https://services.iittp.ac.in/var/vendors/models'
+    )
+}</code></pre>
+      <ul>
+        <li>Replace domain and endpoint with your own.</li>
+        <li>Override via env var:<br><code>CENTRAL_BASE_URL=https://&lt;your-domain&gt;/path/to/models</code></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
